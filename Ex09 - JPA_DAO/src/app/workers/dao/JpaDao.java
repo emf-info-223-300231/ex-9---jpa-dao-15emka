@@ -47,6 +47,16 @@ public class JpaDao<E, PK> implements JpaDaoItf<E, PK> {
      */
     @Override
     public void creer(E e) throws MyDBException {
+        try {
+            et.begin();
+            em.persist(e);
+            et.commit();
+        } catch (Exception ex) {
+            if (et.isActive()) {
+                et.rollback();
+            }
+            throw new MyDBException(SystemLib.getFullMethodName(), ex.getMessage());
+        }
     }
 
     /**
@@ -97,7 +107,9 @@ public class JpaDao<E, PK> implements JpaDaoItf<E, PK> {
                 throw new MyDBException(SystemLib.getFullMethodName(), "RollbackException: " + ex.getMessage());
             }
         } catch (Exception ex) {
-            et.rollback();
+            if (et.isActive()) {
+                    et.rollback();
+                }
             throw new MyDBException(SystemLib.getFullMethodName(), ex.getMessage());
         }
     }
@@ -117,10 +129,14 @@ public class JpaDao<E, PK> implements JpaDaoItf<E, PK> {
                 em.remove(e);
                 et.commit();
             } catch (OptimisticLockException ex) {
-                et.rollback();
+                if (et.isActive()) {
+                    et.rollback();
+                }
                 throw new MyDBException(SystemLib.getFullMethodName(), "OptimisticLockException: " + ex.getMessage());
             } catch (Exception ex) {
-                et.rollback();
+                if (et.isActive()) {
+                    et.rollback();
+                }
                 throw new MyDBException(SystemLib.getFullMethodName(), ex.getMessage());
             }
         }
@@ -156,7 +172,15 @@ public class JpaDao<E, PK> implements JpaDaoItf<E, PK> {
     @Override
     @SuppressWarnings("unchecked")
     public E rechercher(String prop, Object valeur) throws MyDBException {
-        return null;
+        E rep = null;
+        try {
+            Query query = em.createQuery("SELECT p FROM " + cl.getSimpleName() + " p WHERE p." + prop + " = :val");
+            query.setParameter("val", valeur);
+            rep = (E) query.getSingleResult();
+        } catch (Exception ex) {
+            throw new MyDBException(SystemLib.getFullMethodName(), ex.getMessage());
+        }
+        return rep;
     }
 
     /**
@@ -188,7 +212,21 @@ public class JpaDao<E, PK> implements JpaDaoItf<E, PK> {
      */
     @Override
     public int effacerListe() throws MyDBException {
-        int nb;
+        int nb = 0;
+        List<E> list = lireListe();
+        try {
+            et.begin();
+            for (E e : list) {
+                em.remove(e);
+                nb++;
+            }
+            et.commit();
+        } catch (Exception ex) {
+            if (et.isActive()) {
+                et.rollback();
+            }
+            throw new MyDBException(SystemLib.getFullMethodName(), ex.getMessage());
+        }
         return nb;
     }
 
@@ -202,6 +240,19 @@ public class JpaDao<E, PK> implements JpaDaoItf<E, PK> {
     @Override
     public int sauverListe(List<E> list) throws MyDBException {
         int nb = 0;
+        try {
+            et.begin();
+            for (E e : list) {
+                em.merge(e);
+                nb++;
+            }
+            et.commit();
+        } catch (Exception ex) {
+            if (et.isActive()) {
+                et.rollback();
+            }
+            throw new MyDBException(SystemLib.getFullMethodName(), ex.getMessage());
+        }
         return nb;
     }
 
